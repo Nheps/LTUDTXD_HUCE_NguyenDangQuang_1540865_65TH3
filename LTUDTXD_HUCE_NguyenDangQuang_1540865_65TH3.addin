@@ -1,0 +1,11 @@
+﻿<RevitAddIns>
+    <AddIn Type="Application">
+        <Name>LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3</Name>
+        <Assembly>LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3/LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.dll</Assembly>
+        <AddInId>462D55B3-5856-4262-BD7A-C90C0E1E158B</AddInId>
+        <FullClassName>LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Application</FullClassName>
+        <VendorId>Development</VendorId>
+        <VendorDescription></VendorDescription>
+        <VendorEmail></VendorEmail>
+    </AddIn>
+</RevitAddIns>

@@ -1,0 +1,299 @@
+﻿<Window x:Class="LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View.View"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Title="BeamRebar" 
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+   <Window.Resources>
+      <ResourceDictionary>
+         <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml" />
+            <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/materialdesign2.defaults.xaml" />
+            <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.Blue.xaml" />
+            <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/secondary/materialdesigncolor.lime.xaml" />
+         </ResourceDictionary.MergedDictionaries>
+
+         <Style TargetType="TextBlock">
+            <Setter Property="Width" Value="90" />
+            <Setter Property="Height" Value="auto" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="5,15,10,0" />
+            <Setter Property="TextAlignment" Value="Left" />
+         </Style>
+         <Style BasedOn="{StaticResource MaterialDesignFloatingHintComboBox}" TargetType="ComboBox">
+            <Setter Property="Height" Value="auto" />
+            <Setter Property="Width" Value="50" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+         </Style>
+         <Style BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}" TargetType="TextBox">
+            <Setter Property="Width" Value="80" />
+            <Setter Property="Height" Value="auto" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="5,0,10,0" />
+            <Setter Property="TextAlignment" Value="Left" />
+         </Style>
+         <Style BasedOn="{StaticResource MaterialDesignRaisedButton}" TargetType="Button">
+            <Setter Property="Margin" Value="5 0 5 0"/>
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="25"/>
+            <Setter Property="Padding" Value="0 0 0 1"/>
+            <Setter Property="Foreground" Value="Black"/>
+         </Style>
+      </ResourceDictionary>
+   </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+            <GroupBox Margin="0,2,0,5">
+                <GroupBox.Header>
+                    <TextBlock
+            Margin="0"
+            FontWeight="Bold"
+                  Width="auto"
+            Text="Setting thép chính" />
+                </GroupBox.Header>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition  Width="1*"/>
+                            <ColumnDefinition  Width="1*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên lớp 1"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Top1}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+                           materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Top1Count}"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên lớp 2"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Top2}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Top2Count}"/>
+                    </Grid>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên lớp 3"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Top3}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Top3Count}"/>
+                    </Grid>
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên dưới 1"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Bot1}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Bot1Count}"/>
+                    </Grid>
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên dưới 2"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Bot2}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Bot2Count}"/>
+                    </Grid>
+                    <Grid Grid.Row="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Thép trên dưới 3"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Bot3}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding Bot3Count}"/>
+                    </Grid>
+                </Grid>
+            </GroupBox>
+            <GroupBox Margin="0,0,0,5">
+                <GroupBox.Header>
+                    <TextBlock
+Margin="0"
+FontWeight="Bold"
+      Width="auto"
+Text="Setting thép đai" />
+                </GroupBox.Header>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Đai giữa"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding StirrupCenter}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding StirrupCenterSpacing}"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Đai 2 đầu"/>
+                        <ComboBox Grid.Column="1"
+                            materialDesign:HintAssist.Hint="D"
+                            ItemsSource="{Binding TypeList}"
+                            SelectedItem="{Binding Stirrup}"
+                            DisplayMemberPath="Name"/>
+                        <TextBox Grid.Column="2"
+         materialDesign:HintAssist.Hint="Số lượng"
+                           Text="{Binding StirrupSpacing}"/>
+                    </Grid>
+                </Grid>
+            </GroupBox>
+            <GroupBox Margin="0,0,0,5">
+                <GroupBox.Header>
+                    <TextBlock
+                  Margin="0"
+                  FontWeight="Bold"
+                  Width="auto"
+                  Text="Setting neo" />
+                </GroupBox.Header>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Neo trên"/>
+                        <TextBox Grid.Column="1"
+                           materialDesign:HintAssist.Hint="Chiều dài"
+                           Text="{Binding TopAnchor}"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Neo dưới"/>
+                        <TextBox Grid.Column="1"
+                           materialDesign:HintAssist.Hint="Chiều dài"
+                           Text="{Binding BotAnchor}"/>
+                    </Grid>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Lớp BV"/>
+                        <TextBox Grid.Column="1"
+            materialDesign:HintAssist.Hint="Chiều dài"
+            Text="{Binding Cover}"/>
+                    </Grid>
+                </Grid>
+            </GroupBox>
+        </StackPanel>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition Height="50"/>
+            </Grid.RowDefinitions>
+
+            <GroupBox Margin="5 2 2 5">
+                <GroupBox.Header>
+                    <TextBlock
+                        Margin="0"
+                        FontWeight="Bold"
+                        Width="auto"
+                        Text="Mặt cắt dầm" />
+                </GroupBox.Header>
+                <Canvas Name="PreviewCanvas"
+                  Width="200"
+                  Height="350"/>
+            </GroupBox>
+            <StackPanel Grid.Row="2"
+                     Orientation="Horizontal"
+                     HorizontalAlignment="Right">
+                <Button Content="OK" 
+                    Command="{Binding OkCommand}"/>
+                <Button Content="Cancel" Command="{Binding CancelCommand}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
