@@ -125,8 +125,11 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
             if (BeamInfo == null)
                 return;
             var top1 = new UpperRebar(RebarBeamType.Top1, Top1, BeamInfo, TopAnchor, Top1Count);
+            top1.RebarCreation();
             var top2 = new UpperRebar(RebarBeamType.Top2, Top2, BeamInfo, TopAnchor, Top2Count);
+            top2.RebarCreation(); 
             var top3 = new UpperRebar(RebarBeamType.Top3, Top3, BeamInfo, TopAnchor, Top3Count);
+            top3.RebarCreation();
             var bot1 = new LowerRebar(RebarBeamType.Bottom1, Bot1, BeamInfo, BotAnchor, Bot1Count);
             bot1.RebarCreation();
             var bot2 = new LowerRebar(RebarBeamType.Top2, Bot2, BeamInfo, BotAnchor, Bot2Count);

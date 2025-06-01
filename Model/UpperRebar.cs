@@ -21,8 +21,9 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
             RebarBarType = rebarBarType;
             Start = BeamInfo.StartPoint;
             End = BeamInfo.EndPoint;
-            Anchor = anchor;
+            Anchor = anchor.MmToFeet();
             Quantity = quatity;
+            Document = BeamInfo.Families.FirstOrDefault().Document;
             RebarAnalys();
         }
 
@@ -62,8 +63,8 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
             }
             else
             {
-                var start = Start.Add(Anchor * XYZ.BasisZ);
-                var end = End.Add(Anchor * XYZ.BasisZ);
+                var start = Start.Add(Anchor * -XYZ.BasisZ);
+                var end = End.Add(Anchor * -XYZ.BasisZ);
                 for (int i = 0; i < Quantity; i++)
                 {
                     var p1 = start.Add(i * distance * BeamInfo.CrossDirection);
