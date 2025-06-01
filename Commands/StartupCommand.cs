@@ -1,6 +1,6 @@
 ﻿using Autodesk.Revit.Attributes;
 using Nice3point.Revit.Toolkit.External;
-using LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View;
+using LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel;
 
 namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Commands
 {
@@ -17,7 +17,7 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Commands
 			try
 			{
 				var view = new View.View();
-				var viewModel = new ViewModel.RebarBeamViewModel(Document, view);
+				var viewModel = new RebarBeamViewModel(UiDocument, view);
 				viewModel.Run();
 			}
 			catch (Exception)
