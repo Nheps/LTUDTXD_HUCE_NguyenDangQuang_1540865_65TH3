@@ -50,9 +50,25 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
             //MessageBox.Show("Developping......");
             var tran = new Transaction(Document);
             tran.Start("CreateRebar");
+            var failureOptions = tran.GetFailureHandlingOptions();
+            failureOptions.SetFailuresPreprocessor(new DiscardWarningPreprocessor());
+            tran.SetFailureHandlingOptions(failureOptions);
             CreateRebar();
             tran.Commit();
             MainView.Close();
+        }
+
+        private class DiscardWarningPreprocessor : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor failuresAccessor)
+            {
+                foreach (var failure in failuresAccessor.GetFailureMessages())
+                {
+                    if (failure.GetSeverity() == FailureSeverity.Warning)
+                        failuresAccessor.DeleteWarning(failure);
+                }
+                return FailureProcessingResult.Continue;
+            }
         }
 
         [RelayCommand]
@@ -115,7 +131,8 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
         {
             base.OnPropertyChanged(e);
 
-            if (e.PropertyName is nameof(Top1Count) or nameof(Bot1Count) or nameof(Top2Count) or nameof(Bot2Count) or nameof(Top3Count) or nameof(Bot3Count))
+            if (e.PropertyName is nameof(Top1Count) or nameof(Bot1Count) or nameof(Top2Count) or nameof(Bot2Count) or nameof(Top3Count) or nameof(Bot3Count)
+                or nameof(StirrupSpacing) or nameof(StirrupCenterSpacing) or nameof(Cover))
             {
                 UpdateCanvas();
             }
@@ -175,8 +192,7 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
             _canvas.Children.Add(columnRectangle);
 
             var coverpx = Cover * scale;
-            var rebarDiameter = Top1.get_Parameter(BuiltInParameter.REBAR_BAR_DIAMETER)
-                .AsDouble().FeetToMm();
+            var rebarDiameter = Top1.BarModelDiameter.FeetToMm();
             var rebarRadiusPx = (rebarDiameter / 2) * scale;
             var innerWidth = widthPx - 2 * coverpx;
             var innerHeight = heightPx - 2 * coverpx;
@@ -253,5 +269,6 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
             Canvas.SetTop(rebar, y - rebarDiameter / 2);
             _canvas.Children.Add(rebar);
         }
+
     }
 }

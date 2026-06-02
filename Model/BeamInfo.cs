@@ -30,13 +30,15 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
             var widths = new List<double>();
             foreach (var beam in Families)
             {
-                var h = beam.GetParameter("h").AsDouble();
-                var w = beam.GetParameter("b").AsDouble();
+                var type = beam.Document.GetElement(beam.GetTypeId());
+				var h = type.LookupParameter("h").AsDouble();
+                var w = type.LookupParameter("b").AsDouble();
                 heights.Add(h);
                 widths.Add(w);
             }
-
-            if (heights.Count != 1 || widths.Count != 1) return;
+            heights = heights.Distinct().ToList();
+            widths = widths.Distinct().ToList();
+			if (heights.Count != 1 || widths.Count != 1) return;
             Height = heights[0];
             Width = widths[0];
         }

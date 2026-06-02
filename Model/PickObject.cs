@@ -22,10 +22,11 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
             var heights = new List<double>();
             var widths = new List<double>();
             foreach (var beam in eles)
-            {
-                var h = beam.GetParameter("h").AsDouble();
-                var w = beam.GetParameter("b").AsDouble();
-                heights.Add(h);
+			{
+				var type = beam.Document.GetElement(beam.GetTypeId());
+				var h = type.LookupParameter("h").AsDouble();
+				var w = type.LookupParameter("b").AsDouble();
+				heights.Add(h);
                 widths.Add(w);
             }
 

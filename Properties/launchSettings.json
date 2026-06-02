@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3": {
+      "commandName": "Project"
+    },
+    "R24": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Program Files\\Autodesk\\Revit 2024\\Revit.exe"
+    }
+  }
+}
