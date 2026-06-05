@@ -22,9 +22,9 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="BeamRebar — Cốt thép dầm"
-        SizeToContent="WidthAndHeight"      <!-- Cửa sổ tự co dãn theo nội dung -->
-        WindowStartupLocation="CenterScreen" <!-- Hiện giữa màn hình -->
-        ResizeMode="NoResize"               <!-- Không cho phép thay đổi kích thước -->
+        SizeToContent="WidthAndHeight"      
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"               
         TextElement.FontFamily="{DynamicResource MaterialDesignFont}"
         TextElement.FontSize="13">
 
