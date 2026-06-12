@@ -102,8 +102,8 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
                     break;
             }
 
-            // Phân bố ngang: khoảng cách giữa tim các thanh ngoài cùng = Width - 100mm
-            var width = BeamInfo.Width - 100.0.MmToFeet();
+            // Phân bố ngang theo chiều rộng nhỏ nhất để thép vừa với mọi nhịp
+            var width = BeamInfo.MinWidth - 50.0.MmToFeet();
             var distance = width / (Quantity - 1); // bước phân bố giữa các thanh
 
             // Dịch chuyển về phía trái để thanh đầu tiên ở mép trái

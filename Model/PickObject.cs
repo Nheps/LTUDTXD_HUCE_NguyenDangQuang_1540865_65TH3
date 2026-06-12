@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using Autodesk.Revit.UI.Selection;
 using Autodesk.Revit.UI;
 
@@ -16,47 +17,27 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model
         /// <summary>
         /// Yêu cầu người dùng chọn một hoặc nhiều dầm trên mô hình Revit.
         /// Chỉ cho phép chọn phần tử thuộc danh mục Structural Framing (dầm).
-        /// Sau khi chọn, kiểm tra tất cả dầm phải có cùng tiết diện h và b.
+        /// Các dầm phải có cùng chiều rộng b (cho phép khác chiều cao h).
         /// </summary>
-        /// <returns>
-        /// Danh sách dầm hợp lệ, hoặc null nếu không chọn gì
-        /// hoặc các dầm không đồng nhất tiết diện.
-        /// </returns>
+        /// <returns>Danh sách dầm hợp lệ, hoặc null nếu không chọn gì hoặc chiều rộng không đồng nhất.</returns>
         public static List<Element> PickBeams(this UIDocument uiDocument)
         {
-            // Cho phép người dùng chọn nhiều phần tử, lọc qua BeamFilter
             var eles = uiDocument.Selection.PickObjects(ObjectType.Element, new BeamFilter())
               .Select(x => uiDocument.Document.GetElement(x) as Element).ToList();
 
             if (!eles.Any()) return null;
 
-            // Kiểm tra tất cả dầm có cùng tiết diện không
-            return eles.CheckBeams() ? eles : null;
-        }
+            // Kiểm tra tất cả dầm có cùng chiều rộng b
+            var widths = eles.Select(e => e.Document.GetElement(e.GetTypeId()).LookupParameter("b").AsDouble())
+                             .Distinct().ToList();
 
-        /// <summary>
-        /// Kiểm tra danh sách dầm: tất cả phải có cùng chiều cao h và chiều rộng b.
-        /// Điều này cần thiết vì tool chỉ hỗ trợ bố trí thép cho dầm đồng nhất tiết diện.
-        /// </summary>
-        /// <returns>true nếu tất cả dầm có cùng h và b, ngược lại false.</returns>
-        private static bool CheckBeams(this List<Element> eles)
-        {
-            var heights = new List<double>();
-            var widths = new List<double>();
-
-            foreach (var beam in eles)
+            if (widths.Count != 1)
             {
-                var type = beam.Document.GetElement(beam.GetTypeId());
-                var h = type.LookupParameter("h").AsDouble(); // chiều cao dầm
-                var w = type.LookupParameter("b").AsDouble(); // chiều rộng dầm
-                heights.Add(h);
-                widths.Add(w);
+                MessageBox.Show("Các dầm phải có cùng chiều rộng b!", "Lỗi chọn dầm");
+                return null;
             }
 
-            // Nếu sau khi loại trùng còn đúng 1 giá trị → tất cả dầm cùng tiết diện
-            var enumerable = heights.Distinct().ToList();
-            var distinct = widths.Distinct().ToList();
-            return enumerable.Count == 1 && distinct.Count == 1;
+            return eles;
         }
     }
 

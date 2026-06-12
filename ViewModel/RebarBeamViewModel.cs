@@ -86,8 +86,8 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
         [ObservableProperty] private int _topAnchor = 300;
         /// <summary>Chiều dài đoạn neo thép dưới tại 2 đầu dầm (mm). Mặc định 300mm.</summary>
         [ObservableProperty] private int _botAnchor = 300;
-        /// <summary>Chiều dày lớp bảo vệ bê tông (mm). Mặc định 50mm. Dùng cho canvas và đai.</summary>
-        [ObservableProperty] private int _cover = 50;
+        /// <summary>Chiều dày lớp bảo vệ đến tim đai (mm). Mặc định 25mm theo TCVN 5574.</summary>
+        [ObservableProperty] private int _cover = 25;
 
         /// <summary>Canvas WPF dùng để vẽ preview mặt cắt ngang dầm.</summary>
         private Canvas _canvas;
@@ -288,7 +288,7 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
         /// </summary>
         private void UpdateCanvas()
         {
-            if (_canvas == null) return;
+            if (_canvas == null || BeamInfo == null) return;
             _canvas.Children.Clear();
 
             // Kích thước dầm thực tế chuyển sang mm để tính tỉ lệ
@@ -344,15 +344,18 @@ namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
             // (Top1.BarModelDiameter là đường kính danh nghĩa tính bằng feet)
             var rebarRadiusPx = (Top1.BarModelDiameter.FeetToMm() / 2) * scale;
 
+            // Margin thép chủ: 50mm từ mép (nhất quán với code tạo thép thực tế)
+            var rebarMarginPx = 50.0 * scale;
+
             // ── Vẽ thép trên: Y tính từ mép trên xuống theo offset thực tế (mm × scale) ──
-            DrawRebarRow(Top1Count, startX, startY + 50.0 * scale,            widthPx, coverpx, rebarRadiusPx);
-            DrawRebarRow(Top2Count, startX, startY + 130.0 * scale,           widthPx, coverpx, rebarRadiusPx);
-            DrawRebarRow(Top3Count, startX, startY + 210.0 * scale,           widthPx, coverpx, rebarRadiusPx);
+            DrawRebarRow(Top1Count, startX, startY + 50.0 * scale,            widthPx, rebarMarginPx, rebarRadiusPx);
+            DrawRebarRow(Top2Count, startX, startY + 130.0 * scale,           widthPx, rebarMarginPx, rebarRadiusPx);
+            DrawRebarRow(Top3Count, startX, startY + 210.0 * scale,           widthPx, rebarMarginPx, rebarRadiusPx);
 
             // ── Vẽ thép dưới: Y tính từ mép dưới lên theo offset thực tế ──
-            DrawRebarRow(Bot1Count, startX, startY + heightPx - 50.0 * scale,  widthPx, coverpx, rebarRadiusPx);
-            DrawRebarRow(Bot2Count, startX, startY + heightPx - 130.0 * scale, widthPx, coverpx, rebarRadiusPx);
-            DrawRebarRow(Bot3Count, startX, startY + heightPx - 210.0 * scale, widthPx, coverpx, rebarRadiusPx);
+            DrawRebarRow(Bot1Count, startX, startY + heightPx - 50.0 * scale,  widthPx, rebarMarginPx, rebarRadiusPx);
+            DrawRebarRow(Bot2Count, startX, startY + heightPx - 130.0 * scale, widthPx, rebarMarginPx, rebarRadiusPx);
+            DrawRebarRow(Bot3Count, startX, startY + heightPx - 210.0 * scale, widthPx, rebarMarginPx, rebarRadiusPx);
         }
 
         /// <summary>
