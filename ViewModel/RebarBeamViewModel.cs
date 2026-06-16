@@ -1,411 +1,744 @@
-﻿using Autodesk.Revit.DB.Structure;
+using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.Model;
-using LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using Color = System.Windows.Media.Color;
+using Ellipse = System.Windows.Shapes.Ellipse;
+using Line = System.Windows.Shapes.Line;
+using Point = System.Windows.Point;
+using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.ViewModel
 {
-    /// <summary>
-    /// ViewModel chính của tool bố trí cốt thép dầm.
-    /// Kế thừa ObservableObject (CommunityToolkit.Mvvm) để tự động thông báo thay đổi thuộc tính cho View.
-    ///
-    /// Luồng hoạt động:
-    ///   1. Khởi tạo → nạp danh sách loại thép từ Revit (InitData)
-    ///   2. Run() → người dùng chọn dầm → hiện hộp thoại
-    ///   3. Người dùng nhập thông số → canvas tự cập nhật (OnPropertyChanged → UpdateCanvas)
-    ///   4. Nhấn OK → tạo thép trong Transaction → đóng hộp thoại
-    /// </summary>
     public partial class RebarBeamViewModel : ObservableObject
     {
-        #region Thuộc tính và trường dữ liệu
+        private static readonly double[] LayerOffsets = { 50, 130, 210, 290, 370 };
+        private const int MaxLayers = 5;
 
-        /// <summary>Tài liệu Revit hiện hành (để tạo phần tử, truy vấn dữ liệu).</summary>
+        #region Core Fields
+
         private Document Document { get; set; }
-
-        /// <summary>UIDocument — cần để gọi lệnh chọn đối tượng (PickBeams).</summary>
         private UIDocument UiDocument { get; set; }
-
-        /// <summary>Cửa sổ WPF chính — giữ tham chiếu để đóng sau khi hoàn thành.</summary>
         private LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View.View MainView { get; set; }
-
-        /// <summary>Thông tin hình học dầm đã chọn (được gán sau khi người dùng chọn dầm).</summary>
         private BeamInfo BeamInfo { get; set; }
 
-        /// <summary>Danh sách tất cả loại thép (RebarBarType) có trong dự án Revit — nguồn cho ComboBox.</summary>
-        public List<RebarBarType> TypeList { get; set; }
+        public ObservableCollection<RebarBarType> TypeList { get; set; } = new();
 
-        // ── Loại thép từng lớp ──
-        /// <summary>Loại thép trên lớp 1 (Top1).</summary>
-        [ObservableProperty] private RebarBarType _top1;
-        /// <summary>Loại thép trên lớp 2 (Top2).</summary>
-        [ObservableProperty] private RebarBarType _top2;
-        /// <summary>Loại thép trên lớp 3 (Top3).</summary>
-        [ObservableProperty] private RebarBarType _top3;
-        /// <summary>Loại thép dưới lớp 1 (Bot1).</summary>
-        [ObservableProperty] private RebarBarType _bot1;
-        /// <summary>Loại thép dưới lớp 2 (Bot2).</summary>
-        [ObservableProperty] private RebarBarType _bot2;
-        /// <summary>Loại thép dưới lớp 3 (Bot3).</summary>
-        [ObservableProperty] private RebarBarType _bot3;
-        /// <summary>Loại thép đai giữa dầm.</summary>
-        [ObservableProperty] private RebarBarType _stirrupCenter;
-        /// <summary>Loại thép đai 2 đầu dầm.</summary>
-        [ObservableProperty] private RebarBarType _stirrup;
+        // ── Cấu hình theo từng nhịp ────────────────────────────────────────
+        public ObservableCollection<SpanRebarConfig> SpanConfigs { get; } = new();
 
-        // ── Số lượng thanh từng lớp (mặc định) ──
-        /// <summary>Số thanh thép trên lớp 1. Mặc định 3.</summary>
-        [ObservableProperty] private int _top1Count = 3;
-        /// <summary>Số thanh thép trên lớp 2. Mặc định 3.</summary>
-        [ObservableProperty] private int _top2Count = 3;
-        /// <summary>Số thanh thép trên lớp 3. Mặc định 0 (không dùng).</summary>
-        [ObservableProperty] private int _top3Count = 0;
-        /// <summary>Số thanh thép dưới lớp 1. Mặc định 3.</summary>
-        [ObservableProperty] private int _bot1Count = 3;
-        /// <summary>Số thanh thép dưới lớp 2. Mặc định 3.</summary>
-        [ObservableProperty] private int _bot2Count = 3;
-        /// <summary>Số thanh thép dưới lớp 3. Mặc định 0 (không dùng).</summary>
-        [ObservableProperty] private int _bot3Count = 0;
+        /// <summary>Cấu hình của nhịp đang chọn.</summary>
+        public SpanRebarConfig CurrentConfig
+            => SpanConfigs.Count > SelectedSpanIndex ? SpanConfigs[SelectedSpanIndex] : null;
 
-        // ── Thông số đai ──
-        /// <summary>Bước đai giữa dầm (mm). Mặc định 200mm.</summary>
-        [ObservableProperty] private int _stirrupCenterSpacing = 200;
-        /// <summary>Bước đai 2 đầu dầm (mm). Mặc định 100mm.</summary>
-        [ObservableProperty] private int _stirrupSpacing = 100;
+        // ── Nhịp đang chọn ────────────────────────────────────────────────
+        [ObservableProperty] private int _selectedSpanIndex = 0;
 
-        // ── Thông số neo và lớp bảo vệ ──
-        /// <summary>Chiều dài đoạn neo thép trên tại 2 đầu dầm (mm). Mặc định 300mm.</summary>
-        [ObservableProperty] private int _topAnchor = 300;
-        /// <summary>Chiều dài đoạn neo thép dưới tại 2 đầu dầm (mm). Mặc định 300mm.</summary>
-        [ObservableProperty] private int _botAnchor = 300;
-        /// <summary>Chiều dày lớp bảo vệ đến tim đai (mm). Mặc định 25mm theo TCVN 5574.</summary>
-        [ObservableProperty] private int _cover = 25;
+        partial void OnSelectedSpanIndexChanged(int value)
+        {
+            SelectedTopLayer = null;
+            SelectedBotLayer = null;
+            RaiseAllProxies();
+            UpdateCanvas();
+            DrawSpanCanvas();
+        }
 
-        /// <summary>Canvas WPF dùng để vẽ preview mặt cắt ngang dầm.</summary>
-        private Canvas _canvas;
+        // ── UI selection (DataGrid rows) ──────────────────────────────────
+        [ObservableProperty] private RebarLayerItem _selectedTopLayer;
+        [ObservableProperty] private RebarLayerItem _selectedBotLayer;
+
+        // ── Canvas references ─────────────────────────────────────────────
+        private Canvas _topCanvas;
+        private Canvas _botCanvas;
+        private Canvas _stirrupCanvas;
+        private Canvas _spanCanvas;
 
         #endregion
 
-        /// <summary>
-        /// Xử lý khi người dùng nhấn nút OK.
-        /// Mở Transaction, tạo toàn bộ cốt thép, commit, rồi đóng cửa sổ.
-        /// DiscardWarningPreprocessor tự động bỏ qua các cảnh báo Revit
-        /// (ví dụ: thép nằm ngoài phần tử host) để không làm gián đoạn.
-        /// </summary>
+        #region Proxy Properties → CurrentConfig
+
+        // Proxy: danh sách lớp thép (read-only — ItemsSource binding)
+        public ObservableCollection<RebarLayerItem> TopLayers => CurrentConfig?.TopLayers;
+        public ObservableCollection<RebarLayerItem> BotLayers => CurrentConfig?.BotLayers;
+
+        public int TopAnchor
+        {
+            get => CurrentConfig?.TopAnchor ?? 300;
+            set { if (CurrentConfig != null) { CurrentConfig.TopAnchor = value; OnPropertyChanged(); UpdateCanvas(); DrawSpanCanvas(); } }
+        }
+
+        public int BotAnchor
+        {
+            get => CurrentConfig?.BotAnchor ?? 300;
+            set { if (CurrentConfig != null) { CurrentConfig.BotAnchor = value; OnPropertyChanged(); UpdateCanvas(); DrawSpanCanvas(); } }
+        }
+
+        public RebarBarType Stirrup
+        {
+            get => CurrentConfig?.Stirrup;
+            set { if (CurrentConfig != null) { CurrentConfig.Stirrup = value; OnPropertyChanged(); UpdateCanvas(); } }
+        }
+
+        public RebarBarType StirrupCenter
+        {
+            get => CurrentConfig?.StirrupCenter;
+            set { if (CurrentConfig != null) { CurrentConfig.StirrupCenter = value; OnPropertyChanged(); UpdateCanvas(); } }
+        }
+
+        public int StirrupSpacing
+        {
+            get => CurrentConfig?.StirrupSpacing ?? 100;
+            set { if (CurrentConfig != null) { CurrentConfig.StirrupSpacing = value; OnPropertyChanged(); UpdateCanvas(); DrawSpanCanvas(); } }
+        }
+
+        public int StirrupCenterSpacing
+        {
+            get => CurrentConfig?.StirrupCenterSpacing ?? 200;
+            set { if (CurrentConfig != null) { CurrentConfig.StirrupCenterSpacing = value; OnPropertyChanged(); UpdateCanvas(); DrawSpanCanvas(); } }
+        }
+
+        public int Cover
+        {
+            get => CurrentConfig?.Cover ?? 25;
+            set { if (CurrentConfig != null) { CurrentConfig.Cover = value; OnPropertyChanged(); UpdateCanvas(); } }
+        }
+
+        /// <summary>Raise PropertyChanged cho tất cả proxy để WPF binding refresh khi đổi nhịp.</summary>
+        private void RaiseAllProxies()
+        {
+            OnPropertyChanged(nameof(CurrentConfig));
+            OnPropertyChanged(nameof(TopLayers));
+            OnPropertyChanged(nameof(BotLayers));
+            OnPropertyChanged(nameof(TopAnchor));
+            OnPropertyChanged(nameof(BotAnchor));
+            OnPropertyChanged(nameof(Stirrup));
+            OnPropertyChanged(nameof(StirrupCenter));
+            OnPropertyChanged(nameof(StirrupSpacing));
+            OnPropertyChanged(nameof(StirrupCenterSpacing));
+            OnPropertyChanged(nameof(Cover));
+        }
+
+        #endregion
+
+        #region Constructor / Init
+
+        public RebarBeamViewModel(UIDocument uiDocument,
+                                   LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View.View view)
+        {
+            UiDocument = uiDocument;
+            Document   = uiDocument.Document;
+            MainView   = view;
+            MainView.DataContext = this;
+            MainView.Loaded += MainView_Loaded;
+            LoadBarTypes();
+        }
+
+        private void MainView_Loaded(object sender, RoutedEventArgs e)
+        {
+            _topCanvas     = MainView.FindName("TopPreviewCanvas")     as Canvas;
+            _botCanvas     = MainView.FindName("BotPreviewCanvas")     as Canvas;
+            _stirrupCanvas = MainView.FindName("StirrupPreviewCanvas") as Canvas;
+            _spanCanvas    = MainView.FindName("SpanCanvas")           as Canvas;
+
+            MainView.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Render,
+                new Action(() =>
+                {
+                    UpdateCanvas();
+                    DrawSpanCanvas();
+                }));
+        }
+
+        /// <summary>Nạp danh sách loại thép từ Revit (gọi một lần khi khởi tạo).</summary>
+        private void LoadBarTypes()
+        {
+            var types = new FilteredElementCollector(Document)
+                .OfClass(typeof(RebarBarType))
+                .Cast<RebarBarType>()
+                .ToList();
+
+            foreach (var t in types) TypeList.Add(t);
+        }
+
+        /// <summary>Tạo SpanRebarConfig cho mỗi nhịp sau khi có BeamInfo.</summary>
+        private void InitSpanConfigs()
+        {
+            SpanConfigs.Clear();
+            var first = TypeList.FirstOrDefault();
+
+            for (int i = 0; i < BeamInfo.Spans.Count; i++)
+            {
+                var cfg = new SpanRebarConfig(first);
+                HookConfig(cfg);
+                SpanConfigs.Add(cfg);
+            }
+
+            SelectedSpanIndex = 0;
+            RaiseAllProxies();
+        }
+
+        #endregion
+
+        #region Config Hooks
+
+        private void HookConfig(SpanRebarConfig cfg)
+        {
+            HookCollection(cfg.TopLayers);
+            HookCollection(cfg.BotLayers);
+        }
+
+        private void HookCollection(ObservableCollection<RebarLayerItem> col)
+        {
+            col.CollectionChanged += OnLayerCollectionChanged;
+            foreach (var item in col)
+                item.PropertyChanged += OnLayerItemChanged;
+        }
+
+        private void OnLayerCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+                foreach (RebarLayerItem item in e.NewItems)
+                    item.PropertyChanged += OnLayerItemChanged;
+            if (e.OldItems != null)
+                foreach (RebarLayerItem item in e.OldItems)
+                    item.PropertyChanged -= OnLayerItemChanged;
+            UpdateCanvas();
+            DrawSpanCanvas();
+        }
+
+        private void OnLayerItemChanged(object sender, PropertyChangedEventArgs e)
+        {
+            UpdateCanvas();
+            DrawSpanCanvas();
+        }
+
+        private void AddLayerToCollection(ObservableCollection<RebarLayerItem> col,
+                                          RebarBarType barType, int count)
+        {
+            var item = new RebarLayerItem { BarType = barType, Count = count };
+            item.PropertyChanged += OnLayerItemChanged;
+            col.Add(item);
+        }
+
+        #endregion
+
+        #region Commands — Thêm / Xóa lớp thép
+
+        [RelayCommand]
+        private void AddTopLayer()
+        {
+            if (CurrentConfig == null || CurrentConfig.TopLayers.Count >= MaxLayers) return;
+            AddLayerToCollection(CurrentConfig.TopLayers, TypeList.FirstOrDefault(), 2);
+        }
+
+        [RelayCommand]
+        private void RemoveTopLayer()
+        {
+            if (CurrentConfig == null || SelectedTopLayer == null || CurrentConfig.TopLayers.Count <= 1) return;
+            CurrentConfig.TopLayers.Remove(SelectedTopLayer);
+            SelectedTopLayer = CurrentConfig.TopLayers.LastOrDefault();
+        }
+
+        [RelayCommand]
+        private void AddBotLayer()
+        {
+            if (CurrentConfig == null || CurrentConfig.BotLayers.Count >= MaxLayers) return;
+            AddLayerToCollection(CurrentConfig.BotLayers, TypeList.FirstOrDefault(), 2);
+        }
+
+        [RelayCommand]
+        private void RemoveBotLayer()
+        {
+            if (CurrentConfig == null || SelectedBotLayer == null || CurrentConfig.BotLayers.Count <= 1) return;
+            CurrentConfig.BotLayers.Remove(SelectedBotLayer);
+            SelectedBotLayer = CurrentConfig.BotLayers.LastOrDefault();
+        }
+
+        #endregion
+
+        #region OK / Cancel / Run
+
         [RelayCommand]
         private void Ok()
         {
             var tran = new Transaction(Document);
             tran.Start("CreateRebar");
-
-            // Tự động bỏ qua cảnh báo (Warning) trong quá trình tạo thép
-            var failureOptions = tran.GetFailureHandlingOptions();
-            failureOptions.SetFailuresPreprocessor(new DiscardWarningPreprocessor());
-            tran.SetFailureHandlingOptions(failureOptions);
-
+            var opt = tran.GetFailureHandlingOptions();
+            opt.SetFailuresPreprocessor(new DiscardWarningPreprocessor());
+            tran.SetFailureHandlingOptions(opt);
             CreateRebar();
             tran.Commit();
             MainView.Close();
         }
 
-        /// <summary>
-        /// Lớp xử lý lỗi Revit trong Transaction.
-        /// Tự động xóa tất cả Warning (mức độ nhẹ) để Transaction không bị hủy.
-        /// Error (mức độ nghiêm trọng) vẫn được giữ nguyên.
-        /// </summary>
+        [RelayCommand]
+        private void Cancel() => MainView.Close();
+
         private class DiscardWarningPreprocessor : IFailuresPreprocessor
         {
-            public FailureProcessingResult PreprocessFailures(FailuresAccessor failuresAccessor)
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
             {
-                foreach (var failure in failuresAccessor.GetFailureMessages())
-                {
-                    // Chỉ xóa cảnh báo (Warning), không xóa lỗi (Error)
-                    if (failure.GetSeverity() == FailureSeverity.Warning)
-                        failuresAccessor.DeleteWarning(failure);
-                }
+                foreach (var f in a.GetFailureMessages())
+                    if (f.GetSeverity() == FailureSeverity.Warning) a.DeleteWarning(f);
                 return FailureProcessingResult.Continue;
             }
         }
 
-        /// <summary>
-        /// Xử lý khi người dùng nhấn nút Cancel — đóng cửa sổ mà không tạo thép.
-        /// </summary>
-        [RelayCommand]
-        private void Cancel()
-        {
-            MainView.Close();
-        }
-
-        /// <summary>
-        /// Khởi tạo ViewModel.
-        /// Gán DataContext cho View, đăng ký sự kiện Loaded để lấy Canvas,
-        /// và nạp dữ liệu loại thép từ Revit.
-        /// </summary>
-        public RebarBeamViewModel(UIDocument uiDocument, LTUDTXD_HUCE_NguyenDangQuang_1540865_65TH3.View.View view)
-        {
-            UiDocument = uiDocument;
-            Document = uiDocument.Document;
-            MainView = view;
-
-            // Gán ViewModel làm DataContext để View binding dữ liệu
-            MainView.DataContext = this;
-
-            // Sau khi View load xong mới có thể tìm Canvas theo tên
-            MainView.Loaded += MainView_Loaded;
-
-            InitData();
-        }
-
-        /// <summary>
-        /// Được gọi sau khi cửa sổ WPF đã load xong.
-        /// Lấy tham chiếu Canvas "PreviewCanvas" và vẽ mặt cắt ban đầu.
-        /// </summary>
-        private void MainView_Loaded(object sender, RoutedEventArgs e)
-        {
-            _canvas = MainView.FindName("PreviewCanvas") as Canvas;
-            UpdateCanvas();
-        }
-
-        /// <summary>
-        /// Nạp danh sách loại thép (RebarBarType) từ dự án Revit hiện hành.
-        /// Gán mặc định loại đầu tiên cho tất cả các lớp thép.
-        /// </summary>
-        private void InitData()
-        {
-            // Lấy tất cả RebarBarType trong dự án bằng FilteredElementCollector
-            TypeList = new FilteredElementCollector(Document)
-              .OfClass(typeof(RebarBarType))
-              .Cast<RebarBarType>()
-              .ToList();
-
-            if (TypeList.Count == 0) return;
-
-            // Gán loại thép mặc định (loại đầu tiên) cho tất cả ComboBox
-            Top1 = TypeList.FirstOrDefault();
-            Top2 = TypeList.FirstOrDefault();
-            Top3 = TypeList.FirstOrDefault();
-            Bot1 = TypeList.FirstOrDefault();
-            Bot2 = TypeList.FirstOrDefault();
-            Bot3 = TypeList.FirstOrDefault();
-            StirrupCenter = TypeList.FirstOrDefault();
-            Stirrup = TypeList.FirstOrDefault();
-        }
-
-        /// <summary>
-        /// Điểm khởi chạy chính của tool.
-        /// Yêu cầu người dùng chọn dầm, xây dựng BeamInfo, rồi hiện hộp thoại.
-        /// </summary>
         public void Run()
         {
             if (MainView == null) return;
-
-            // Yêu cầu người dùng chọn dầm từ mô hình
             var beams = UiDocument.PickBeams();
-            if (beams.Count > 0)
+            if (beams == null || beams.Count == 0)
             {
-                // Trích xuất thông tin hình học từ danh sách dầm đã chọn
-                BeamInfo = new BeamInfo(beams);
-
-                // Hiện hộp thoại dưới dạng modal (chờ người dùng nhấn OK/Cancel)
-                MainView.ShowDialog();
+                MessageBox.Show("Vui lòng chọn ít nhất một dầm hợp lệ!", "Beam Rebar");
+                return;
             }
-            else
-            {
-                MessageBox.Show("Error");
-            }
+            BeamInfo = new BeamInfo(beams);
+            InitSpanConfigs();
+            MainView.ShowDialog();
         }
 
-        /// <summary>
-        /// Được gọi mỗi khi bất kỳ thuộc tính nào thay đổi (do CommunityToolkit.Mvvm).
-        /// Chỉ cập nhật canvas khi các thuộc tính ảnh hưởng đến hình dạng mặt cắt thay đổi.
-        /// </summary>
-        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
-        {
-            base.OnPropertyChanged(e);
+        #endregion
 
-            // Cập nhật canvas khi thay đổi số lượng thép, bước đai, hoặc lớp bảo vệ
-            if (e.PropertyName is nameof(Top1Count) or nameof(Bot1Count) or nameof(Top2Count) or nameof(Bot2Count) or nameof(Top3Count) or nameof(Bot3Count)
-                or nameof(StirrupSpacing) or nameof(StirrupCenterSpacing) or nameof(Cover))
-            {
-                UpdateCanvas();
-            }
-        }
+        #region Rebar Creation
 
-        /// <summary>
-        /// Tạo toàn bộ cốt thép trong Revit theo thông số người dùng nhập.
-        /// Thứ tự tạo: thép trên (3 lớp) → thép dưới (3 lớp) → thép đai.
-        /// </summary>
         private void CreateRebar()
         {
             if (BeamInfo == null) return;
+            int n = BeamInfo.Spans.Count;
 
-            // ── Thép chính phía trên ──
-            var top1 = new UpperRebar(RebarBeamType.Top1, Top1, BeamInfo, TopAnchor, Top1Count);
-            top1.RebarCreation();
-
-            var top2 = new UpperRebar(RebarBeamType.Top2, Top2, BeamInfo, TopAnchor, Top2Count);
-            top2.RebarCreation();
-
-            var top3 = new UpperRebar(RebarBeamType.Top3, Top3, BeamInfo, TopAnchor, Top3Count);
-            top3.RebarCreation();
-
-            // ── Thép chính phía dưới ──
-            var bot1 = new LowerRebar(RebarBeamType.Bottom1, Bot1, BeamInfo, BotAnchor, Bot1Count);
-            bot1.RebarCreation();
-
-            // Lưu ý: Bot2 dùng RebarBeamType.Top2 để lấy đúng offset 130mm từ mép dưới
-            var bot2 = new LowerRebar(RebarBeamType.Top2, Bot2, BeamInfo, BotAnchor, Bot2Count);
-            bot2.RebarCreation();
-
-            var bot3 = new LowerRebar(RebarBeamType.Bottom3, Bot3, BeamInfo, BotAnchor, Bot3Count);
-            bot3.RebarCreation();
-
-            // ── Thép đai ──
-            var stirrup = new StirrupRebar(StirrupCenter, Stirrup, BeamInfo, Cover, StirrupCenterSpacing, StirrupSpacing);
-            stirrup.RebarCreation();
-        }
-        /// <summary>
-        /// Vẽ preview mặt cắt ngang dầm lên Canvas WPF.
-        /// Được gọi mỗi khi người dùng thay đổi số lượng thép, bước đai hoặc lớp bảo vệ.
-        ///
-        /// Quy trình vẽ:
-        ///   1. Tính tỉ lệ scale để dầm vừa khung canvas (giữ tỉ lệ thực)
-        ///   2. Căn giữa hình chữ nhật dầm trong canvas
-        ///   3. Vẽ đường viền đai (hình chữ nhật cách mép cover)
-        ///   4. Vẽ các chấm tròn thể hiện tiết diện từng thanh thép
-        ///
-        /// Tọa độ Y của từng lớp thép khớp chính xác với offset trong UpperRebar/LowerRebar:
-        ///   Top: 50mm, 130mm, 210mm tính từ mép trên
-        ///   Bot: 50mm, 130mm, 210mm tính từ mép dưới
-        /// </summary>
-        private void UpdateCanvas()
-        {
-            if (_canvas == null || BeamInfo == null) return;
-            _canvas.Children.Clear();
-
-            // Kích thước dầm thực tế chuyển sang mm để tính tỉ lệ
-            var width = BeamInfo.Width.FeetToMm();
-            var height = BeamInfo.Height.FeetToMm();
-            double canvasWidth = _canvas.ActualWidth;
-            double canvasHeight = _canvas.ActualHeight;
-            if (canvasWidth == 0 || canvasHeight == 0) return;
-
-            // Tính tỉ lệ scale: lấy min để dầm vừa khung canvas theo cả 2 chiều
-            double scaleX = canvasWidth / width;
-            double scaleY = canvasHeight / height;
-            double scale = Math.Min(scaleX, scaleY);
-
-            // Kích thước dầm tính bằng pixel
-            double widthPx = width * scale;
-            double heightPx = height * scale;
-
-            // Tọa độ góc trên-trái của hình chữ nhật dầm (căn giữa canvas)
-            double startX = (canvasWidth - widthPx) / 2;
-            double startY = (canvasHeight - heightPx) / 2;
-
-            // ── Vẽ hình chữ nhật biên dầm ──
-            var beamRect = new System.Windows.Shapes.Rectangle
+            // ── Thép trên: merge nhịp liền kề cùng config ────────────────
+            for (int layerIdx = 0; layerIdx < LayerOffsets.Length; layerIdx++)
             {
-                Width = widthPx,
-                Height = heightPx,
-                Stroke = System.Windows.Media.Brushes.Black,
-                StrokeThickness = 1,
-                Fill = System.Windows.Media.Brushes.White
-            };
-            Canvas.SetLeft(beamRect, startX);
-            Canvas.SetTop(beamRect, startY);
-            _canvas.Children.Add(beamRect);
+                int s = 0;
+                while (s < n)
+                {
+                    var sCfg = s < SpanConfigs.Count ? SpanConfigs[s] : null;
+                    if (sCfg == null || sCfg.TopLayers.Count <= layerIdx) { s++; continue; }
 
-            // Chiều dày lớp bảo vệ tính bằng pixel
-            var coverpx = Cover * scale;
+                    var refLayer = sCfg.TopLayers[layerIdx];
+                    int e = s;
 
-            // ── Vẽ đường viền đai (hình chữ nhật cách mép dầm = cover) ──
-            var stirrupRect = new System.Windows.Shapes.Rectangle
+                    // Kéo dài đoạn chạy khi nhịp tiếp theo có cùng cấu hình
+                    while (e + 1 < n)
+                    {
+                        var nCfg = e + 1 < SpanConfigs.Count ? SpanConfigs[e + 1] : null;
+                        if (nCfg == null || nCfg.TopLayers.Count <= layerIdx) break;
+                        var nLayer = nCfg.TopLayers[layerIdx];
+                        if (nLayer.Count != refLayer.Count ||
+                            nLayer.BarType?.Id != refLayer.BarType?.Id) break;
+                        e++;
+                    }
+
+                    int anchor = Math.Max(SpanConfigs[s].TopAnchor,
+                                         e < SpanConfigs.Count ? SpanConfigs[e].TopAnchor : 0);
+                    new UpperRebar(LayerOffsets[layerIdx], refLayer.BarType, BeamInfo,
+                                   BeamInfo.Spans[s].StartPoint,
+                                   BeamInfo.Spans[e].EndPoint,
+                                   anchor, refLayer.Count).RebarCreation();
+                    s = e + 1;
+                }
+            }
+
+            // ── Thép dưới: merge nhịp liền kề cùng config + cùng chiều cao ─
+            for (int layerIdx = 0; layerIdx < LayerOffsets.Length; layerIdx++)
             {
-                Width = widthPx - 2 * coverpx,
-                Height = heightPx - 2 * coverpx,
-                Stroke = System.Windows.Media.Brushes.DarkGray,
-                StrokeThickness = 1.5,
-                Fill = System.Windows.Media.Brushes.Transparent
-            };
-            Canvas.SetLeft(stirrupRect, startX + coverpx);
-            Canvas.SetTop(stirrupRect, startY + coverpx);
-            _canvas.Children.Add(stirrupRect);
+                int s = 0;
+                while (s < n)
+                {
+                    var sCfg = s < SpanConfigs.Count ? SpanConfigs[s] : null;
+                    if (sCfg == null || sCfg.BotLayers.Count <= layerIdx) { s++; continue; }
 
-            // Bán kính chấm tròn thép = nửa đường kính thực × scale
-            // (Top1.BarModelDiameter là đường kính danh nghĩa tính bằng feet)
-            var rebarRadiusPx = (Top1.BarModelDiameter.FeetToMm() / 2) * scale;
+                    var refLayer = sCfg.BotLayers[layerIdx];
+                    double refH  = BeamInfo.Spans[s].Height;
+                    double refW  = BeamInfo.Spans[s].Width;
+                    int e = s;
 
-            // Margin thép chủ: 50mm từ mép (nhất quán với code tạo thép thực tế)
-            var rebarMarginPx = 50.0 * scale;
+                    while (e + 1 < n)
+                    {
+                        var nCfg = e + 1 < SpanConfigs.Count ? SpanConfigs[e + 1] : null;
+                        if (nCfg == null || nCfg.BotLayers.Count <= layerIdx) break;
+                        var nLayer = nCfg.BotLayers[layerIdx];
+                        if (nLayer.Count != refLayer.Count ||
+                            nLayer.BarType?.Id != refLayer.BarType?.Id ||
+                            Math.Abs(BeamInfo.Spans[e + 1].Height - refH) > 0.001) break;
+                        e++;
+                    }
 
-            // ── Vẽ thép trên: Y tính từ mép trên xuống theo offset thực tế (mm × scale) ──
-            DrawRebarRow(Top1Count, startX, startY + 50.0 * scale,            widthPx, rebarMarginPx, rebarRadiusPx);
-            DrawRebarRow(Top2Count, startX, startY + 130.0 * scale,           widthPx, rebarMarginPx, rebarRadiusPx);
-            DrawRebarRow(Top3Count, startX, startY + 210.0 * scale,           widthPx, rebarMarginPx, rebarRadiusPx);
+                    // Tạo SpanInfo đại diện toàn đoạn liên tục
+                    var mergedSpan = new SpanInfo
+                    {
+                        StartPoint = BeamInfo.Spans[s].StartPoint,
+                        EndPoint   = BeamInfo.Spans[e].EndPoint,
+                        Height     = refH,
+                        Width      = refW,
+                        Family     = BeamInfo.Spans[s].Family
+                    };
+                    int anchor = Math.Max(SpanConfigs[s].BotAnchor,
+                                         e < SpanConfigs.Count ? SpanConfigs[e].BotAnchor : 0);
+                    new LowerRebar(LayerOffsets[layerIdx], refLayer.BarType, BeamInfo,
+                                   mergedSpan,
+                                   isFirstSpan: s == 0,
+                                   isLastSpan:  e == n - 1,
+                                   anchor, refLayer.Count).RebarCreation();
+                    s = e + 1;
+                }
+            }
 
-            // ── Vẽ thép dưới: Y tính từ mép dưới lên theo offset thực tế ──
-            DrawRebarRow(Bot1Count, startX, startY + heightPx - 50.0 * scale,  widthPx, rebarMarginPx, rebarRadiusPx);
-            DrawRebarRow(Bot2Count, startX, startY + heightPx - 130.0 * scale, widthPx, rebarMarginPx, rebarRadiusPx);
-            DrawRebarRow(Bot3Count, startX, startY + heightPx - 210.0 * scale, widthPx, rebarMarginPx, rebarRadiusPx);
-        }
-
-        /// <summary>
-        /// Vẽ một hàng ngang gồm <paramref name="count"/> chấm thép trên canvas.
-        /// Các chấm được phân bố đều từ mép trái đến mép phải (cách mép cover).
-        /// Trường hợp count = 1: đặt chấm tại tâm dầm.
-        /// </summary>
-        /// <param name="count">Số thanh thép trong hàng.</param>
-        /// <param name="startX">Tọa độ X góc trái hình chữ nhật dầm (pixel).</param>
-        /// <param name="y">Tọa độ Y tâm hàng thép (pixel).</param>
-        /// <param name="widthPx">Chiều rộng dầm tính bằng pixel.</param>
-        /// <param name="coverpx">Lớp bảo vệ tính bằng pixel.</param>
-        /// <param name="rebarRadiusPx">Bán kính chấm tròn thép (pixel).</param>
-        private void DrawRebarRow(int count, double startX, double y, double widthPx, double coverpx, double rebarRadiusPx)
-        {
-            if (count <= 0) return;
-
-            // Chiều rộng vùng phân bố (từ tim đai trái đến tim đai phải)
-            double innerWidth = widthPx - 2 * coverpx;
-
-            for (int i = 0; i < count; i++)
+            // ── Đai: luôn per span (bước đai khác nhau theo nhịp) ─────────
+            for (int spanIdx = 0; spanIdx < n && spanIdx < SpanConfigs.Count; spanIdx++)
             {
-                // count = 1: đặt tại tâm; count > 1: phân bố đều
-                double x = count == 1
-                    ? startX + widthPx / 2
-                    : startX + coverpx + i * (innerWidth / (count - 1));
-                DrawRebar(rebarRadiusPx, x, y);
+                var cfg  = SpanConfigs[spanIdx];
+                var span = BeamInfo.Spans[spanIdx];
+                new StirrupRebar(cfg.StirrupCenter, cfg.Stirrup, BeamInfo,
+                                 span, cfg.Cover, cfg.StirrupCenterSpacing, cfg.StirrupSpacing)
+                    .RebarCreation();
             }
         }
 
-        /// <summary>
-        /// Vẽ một chấm tròn (Ellipse) đại diện cho tiết diện thanh thép tại tọa độ (x, y).
-        /// </summary>
-        /// <param name="rebarRadiusPx">Bán kính chấm (pixel) — đã nhân scale, không cần nhân lại.</param>
-        /// <param name="x">Tọa độ X tâm chấm (pixel).</param>
-        /// <param name="y">Tọa độ Y tâm chấm (pixel).</param>
-        private void DrawRebar(double rebarRadiusPx, double x, double y)
+        #endregion
+
+        #region Canvas Drawing
+
+        private void UpdateCanvas()
         {
-            double diameter = rebarRadiusPx * 2;
-            var rebar = new System.Windows.Shapes.Ellipse
-            {
-                Width = diameter,
-                Height = diameter,
-                Fill = System.Windows.Media.Brushes.DarkBlue,
-            };
-            // SetLeft/Top đặt góc trên-trái → trừ đi bán kính để tâm trùng với (x, y)
-            Canvas.SetLeft(rebar, x - diameter / 2);
-            Canvas.SetTop(rebar, y - diameter / 2);
-            _canvas.Children.Add(rebar);
+            DrawSection(_topCanvas);
+            DrawSection(_botCanvas);
+            DrawSection(_stirrupCanvas);
         }
 
+        private void DrawSection(Canvas canvas)
+        {
+            if (canvas == null || BeamInfo == null || CurrentConfig == null) return;
+            canvas.Children.Clear();
+
+            var span   = SelectedSpanIndex < BeamInfo.Spans.Count
+                       ? BeamInfo.Spans[SelectedSpanIndex]
+                       : BeamInfo.Spans[0];
+            double beamW = span.Width.FeetToMm();
+            double beamH = span.Height.FeetToMm();
+
+            double cW = canvas.ActualWidth  > 0 ? canvas.ActualWidth  : canvas.Width;
+            double cH = canvas.ActualHeight > 0 ? canvas.ActualHeight : canvas.Height;
+            if (cW <= 0 || cH <= 0) return;
+
+            double scale = Math.Min(cW / beamW, cH / beamH) * 0.82;
+            double wPx   = beamW * scale;
+            double hPx   = beamH * scale;
+            double ox    = (cW - wPx) / 2;
+            double oy    = (cH - hPx) / 2;
+
+            AddRect(canvas, ox, oy, wPx, hPx, Brushes.Black, 1.5, Brushes.White);
+
+            double cvPx = CurrentConfig.Cover * scale;
+            AddRect(canvas, ox + cvPx, oy + cvPx, wPx - 2 * cvPx, hPx - 2 * cvPx,
+                    Brushes.DimGray, 1.5, Brushes.Transparent);
+
+            var firstType = CurrentConfig.TopLayers.FirstOrDefault()?.BarType
+                         ?? CurrentConfig.BotLayers.FirstOrDefault()?.BarType;
+            double rPx = firstType != null
+                ? (firstType.BarModelDiameter.FeetToMm() / 2) * scale
+                : 4;
+            double mPx = 50.0 * scale;
+
+            for (int i = 0; i < CurrentConfig.TopLayers.Count && i < LayerOffsets.Length; i++)
+                DrawRebarRow(canvas, CurrentConfig.TopLayers[i].Count, ox,
+                             oy + LayerOffsets[i] * scale, wPx, mPx, rPx, Brushes.DarkBlue);
+
+            for (int i = 0; i < CurrentConfig.BotLayers.Count && i < LayerOffsets.Length; i++)
+                DrawRebarRow(canvas, CurrentConfig.BotLayers[i].Count, ox,
+                             oy + hPx - LayerOffsets[i] * scale, wPx, mPx, rPx, Brushes.DarkRed);
+        }
+
+        private static void AddRect(Canvas canvas, double x, double y, double w, double h,
+                                    Brush stroke, double thickness, Brush fill)
+        {
+            var r = new Rectangle { Width = w, Height = h, Stroke = stroke, StrokeThickness = thickness, Fill = fill };
+            Canvas.SetLeft(r, x); Canvas.SetTop(r, y);
+            canvas.Children.Add(r);
+        }
+
+        private static void DrawRebarRow(Canvas canvas, int count,
+                                         double ox, double y, double wPx, double mPx, double r, Brush fill)
+        {
+            if (count <= 0) return;
+            double innerW = wPx - 2 * mPx;
+            for (int i = 0; i < count; i++)
+            {
+                double x = count == 1 ? ox + wPx / 2 : ox + mPx + i * (innerW / (count - 1));
+                var e = new Ellipse { Width = r * 2, Height = r * 2, Fill = fill };
+                Canvas.SetLeft(e, x - r); Canvas.SetTop(e, y - r);
+                canvas.Children.Add(e);
+            }
+        }
+
+        private void DrawSpanCanvas()
+        {
+            if (_spanCanvas == null || BeamInfo == null || !BeamInfo.Spans.Any()) return;
+            _spanCanvas.Children.Clear();
+
+            double cW = _spanCanvas.ActualWidth;
+            double cH = _spanCanvas.ActualHeight;
+            if (cW <= 0 || cH <= 0) return;
+
+            double totalMm = BeamInfo.Spans.Sum(s => s.StartPoint.DistanceTo(s.EndPoint).FeetToMm());
+            double marginX = 52;
+            double hScale  = (cW - 2 * marginX) / totalMm;
+            double totalPx = totalMm * hScale;
+
+            double beamHeightMm = BeamInfo.Height.FeetToMm();
+            double beamH        = cH * 0.55;
+            double beamTop      = cH * 0.20;
+            double vScale       = beamH / beamHeightMm;
+
+            DrawDimLine(_spanCanvas, marginX, marginX + totalPx, beamTop - 20,
+                        $"Tổng: {(int)totalMm} mm");
+
+            // ── Vẽ từng nhịp ──────────────────────────────────────────────
+            double x = marginX;
+            for (int i = 0; i < BeamInfo.Spans.Count; i++)
+            {
+                var span     = BeamInfo.Spans[i];
+                var cfg      = i < SpanConfigs.Count ? SpanConfigs[i] : null;
+                double mm    = span.StartPoint.DistanceTo(span.EndPoint).FeetToMm();
+                double px    = mm * hScale;
+                double spanH = span.Height.FeetToMm() * vScale;
+                bool isSelected = i == SelectedSpanIndex;
+
+                var fillColor = isSelected
+                    ? Color.FromArgb(55, 21, 101, 192)
+                    : Color.FromArgb(18, 100, 149, 237);
+                AddRect(_spanCanvas, x, beamTop, px, spanH,
+                        isSelected ? Brushes.DodgerBlue : Brushes.Black,
+                        isSelected ? 2.0 : 1.5,
+                        new SolidColorBrush(fillColor));
+
+                PutText(_spanCanvas, $"Nhịp {i}", x + px / 2, beamTop - 16,
+                        isSelected ? FontWeights.Bold : FontWeights.SemiBold, 11, center: true);
+
+                PutText(_spanCanvas, $"{(int)mm} mm", x + px / 2, beamTop + spanH + 18,
+                        FontWeights.Normal, 10, center: true);
+                if (isSelected)
+                    PutText(_spanCanvas,
+                            $"h={(int)span.Height.FeetToMm()}  b={(int)span.Width.FeetToMm()}",
+                            x + px / 2, beamTop + spanH + 30, FontWeights.Normal, 9, center: true);
+
+                // Đai theo cấu hình nhịp này
+                if (cfg != null)
+                    DrawStirrupsInSpan(x, px, beamTop, spanH, hScale,
+                                       cfg.StirrupSpacing, cfg.StirrupCenterSpacing);
+
+                DrawSupport(_spanCanvas, x, beamTop + spanH);
+
+                int capturedIdx = i;
+                var overlay = new Rectangle
+                {
+                    Width  = px,
+                    Height = spanH,
+                    Fill   = Brushes.Transparent,
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    ToolTip = $"Nhịp {i}  —  L={(int)mm} mm  h={(int)span.Height.FeetToMm()} mm  b={(int)span.Width.FeetToMm()} mm"
+                };
+                overlay.MouseLeftButtonDown += (_, e) =>
+                {
+                    SelectedSpanIndex = capturedIdx;
+                    e.Handled = true;
+                };
+                Canvas.SetLeft(overlay, x);
+                Canvas.SetTop(overlay, beamTop);
+                _spanCanvas.Children.Add(overlay);
+
+                x += px;
+            }
+            DrawSupport(_spanCanvas, x, BeamInfo.Spans.Last().Height.FeetToMm() * vScale + beamTop);
+
+            // ── Precompute vị trí X từng nhịp ────────────────────────────
+            int totalSpans = BeamInfo.Spans.Count;
+            double[] spanX  = new double[totalSpans];
+            double[] spanPx = new double[totalSpans];
+            {
+                double cx2 = marginX;
+                for (int i = 0; i < totalSpans; i++)
+                {
+                    spanX[i]  = cx2;
+                    spanPx[i] = BeamInfo.Spans[i].StartPoint.DistanceTo(BeamInfo.Spans[i].EndPoint).FeetToMm() * hScale;
+                    cx2 += spanPx[i];
+                }
+            }
+
+            // ── Thép trên: vẽ từng đoạn liên tục ─────────────────────────
+            for (int layerIdx = 0; layerIdx < LayerOffsets.Length; layerIdx++)
+            {
+                int s = 0;
+                while (s < totalSpans)
+                {
+                    var sCfg = s < SpanConfigs.Count ? SpanConfigs[s] : null;
+                    if (sCfg == null || sCfg.TopLayers.Count <= layerIdx) { s++; continue; }
+
+                    var refLayer = sCfg.TopLayers[layerIdx];
+                    int e = s;
+                    while (e + 1 < totalSpans)
+                    {
+                        var nCfg = e + 1 < SpanConfigs.Count ? SpanConfigs[e + 1] : null;
+                        if (nCfg == null || nCfg.TopLayers.Count <= layerIdx) break;
+                        var nL = nCfg.TopLayers[layerIdx];
+                        if (nL.Count != refLayer.Count || nL.BarType?.Id != refLayer.BarType?.Id) break;
+                        e++;
+                    }
+
+                    var eCfg = e < SpanConfigs.Count ? SpanConfigs[e] : sCfg;
+                    double gx1 = spanX[s];
+                    double gx2 = spanX[e] + spanPx[e];
+                    double ry  = beamTop + LayerOffsets[layerIdx] * vScale;
+                    double aStart = Math.Min(sCfg.TopAnchor * vScale, beamH * 0.38);
+                    double aEnd   = Math.Min(eCfg.TopAnchor * vScale, beamH * 0.38);
+
+                    var pts = new List<Point>();
+                    if (s == 0 && sCfg.TopAnchor > 0)        pts.Add(new Point(gx1, ry + aStart));
+                    pts.Add(new Point(gx1, ry));
+                    pts.Add(new Point(gx2, ry));
+                    if (e == totalSpans - 1 && eCfg.TopAnchor > 0) pts.Add(new Point(gx2, ry + aEnd));
+                    DrawPolyline(_spanCanvas, pts, Brushes.DarkBlue, 1.6);
+
+                    s = e + 1;
+                }
+            }
+
+            // ── Thép dưới: merge khi cùng config + cùng chiều cao dầm ────
+            for (int layerIdx = 0; layerIdx < LayerOffsets.Length; layerIdx++)
+            {
+                int s = 0;
+                while (s < totalSpans)
+                {
+                    var sCfg = s < SpanConfigs.Count ? SpanConfigs[s] : null;
+                    if (sCfg == null || sCfg.BotLayers.Count <= layerIdx) { s++; continue; }
+
+                    var refLayer = sCfg.BotLayers[layerIdx];
+                    double refH  = BeamInfo.Spans[s].Height;
+                    int e = s;
+                    while (e + 1 < totalSpans)
+                    {
+                        var nCfg = e + 1 < SpanConfigs.Count ? SpanConfigs[e + 1] : null;
+                        if (nCfg == null || nCfg.BotLayers.Count <= layerIdx) break;
+                        var nL = nCfg.BotLayers[layerIdx];
+                        if (nL.Count != refLayer.Count || nL.BarType?.Id != refLayer.BarType?.Id ||
+                            Math.Abs(BeamInfo.Spans[e + 1].Height - refH) > 0.001) break;
+                        e++;
+                    }
+
+                    var eCfg     = e < SpanConfigs.Count ? SpanConfigs[e] : sCfg;
+                    double spanH = refH.FeetToMm() * vScale;
+                    double gx1   = spanX[s];
+                    double gx2   = spanX[e] + spanPx[e];
+                    double ry    = beamTop + spanH - LayerOffsets[layerIdx] * vScale;
+                    double aStart = Math.Min(sCfg.BotAnchor * vScale, beamH * 0.38);
+                    double aEnd   = Math.Min(eCfg.BotAnchor * vScale, beamH * 0.38);
+
+                    var pts = new List<Point>();
+                    if (s == 0 && sCfg.BotAnchor > 0)             pts.Add(new Point(gx1, ry - aStart));
+                    pts.Add(new Point(gx1, ry));
+                    pts.Add(new Point(gx2, ry));
+                    if (e == totalSpans - 1 && eCfg.BotAnchor > 0) pts.Add(new Point(gx2, ry - aEnd));
+                    DrawPolyline(_spanCanvas, pts, Brushes.DarkRed, 1.6);
+
+                    s = e + 1;
+                }
+            }
+        }
+
+        private void DrawStirrupsInSpan(double spanX, double spanPx,
+                                        double beamTop, double beamH, double hScale,
+                                        int stirrupSpacing, int stirrupCenterSpacing)
+        {
+            double endPx      = spanPx / 4;
+            double centerPx   = spanPx / 2;
+            double endSpPx    = stirrupSpacing       * hScale;
+            double centerSpPx = stirrupCenterSpacing * hScale;
+
+            DrawStirrupZone(spanX,            endPx,    beamTop, beamH, endSpPx);
+            DrawStirrupZone(spanX + endPx,    centerPx, beamTop, beamH, centerSpPx);
+            DrawStirrupZone(spanX + 3*endPx,  endPx,    beamTop, beamH, endSpPx);
+        }
+
+        private void DrawStirrupZone(double zoneX, double zonePx,
+                                     double beamTop, double beamH, double spacingPx)
+        {
+            if (spacingPx <= 1) return;
+            double x = zoneX + spacingPx;
+            int maxCount = 30;
+            while (x < zoneX + zonePx - spacingPx * 0.5 && maxCount-- > 0)
+            {
+                _spanCanvas.Children.Add(new Line
+                {
+                    X1 = x, Y1 = beamTop + 1.5,
+                    X2 = x, Y2 = beamTop + beamH - 1.5,
+                    Stroke = new SolidColorBrush(Color.FromRgb(110, 110, 110)),
+                    StrokeThickness = 0.9
+                });
+                x += spacingPx;
+            }
+        }
+
+        private static void DrawPolyline(Canvas canvas, List<Point> pts, Brush stroke, double thickness)
+        {
+            for (int i = 0; i < pts.Count - 1; i++)
+                canvas.Children.Add(new Line
+                {
+                    X1 = pts[i].X,     Y1 = pts[i].Y,
+                    X2 = pts[i + 1].X, Y2 = pts[i + 1].Y,
+                    Stroke = stroke, StrokeThickness = thickness
+                });
+        }
+
+        private static void DrawSupport(Canvas canvas, double cx, double baseY)
+        {
+            canvas.Children.Add(new Polygon
+            {
+                Points = new PointCollection
+                {
+                    new Point(cx, baseY), new Point(cx - 9, baseY + 14), new Point(cx + 9, baseY + 14)
+                },
+                Fill = Brushes.DimGray, Stroke = Brushes.Black, StrokeThickness = 1
+            });
+            canvas.Children.Add(new Line
+            {
+                X1 = cx - 11, Y1 = baseY + 14, X2 = cx + 11, Y2 = baseY + 14,
+                Stroke = Brushes.Black, StrokeThickness = 1.5
+            });
+        }
+
+        private static void DrawDimLine(Canvas canvas, double x1, double x2, double y, string text)
+        {
+            canvas.Children.Add(new Line
+            {
+                X1 = x1, Y1 = y, X2 = x2, Y2 = y,
+                Stroke = Brushes.DimGray, StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 3, 2 }
+            });
+            PutText(canvas, text, (x1 + x2) / 2, y - 14, FontWeights.Normal, 10, center: true);
+        }
+
+        private static void PutText(Canvas canvas, string text, double cx, double y,
+                                    FontWeight weight, double size, bool center)
+        {
+            var tb = new System.Windows.Controls.TextBlock
+            {
+                Text = text, FontSize = size, FontWeight = weight, Foreground = Brushes.Black
+            };
+            tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double left = center ? cx - tb.DesiredSize.Width / 2 : cx;
+            Canvas.SetLeft(tb, left); Canvas.SetTop(tb, y);
+            canvas.Children.Add(tb);
+        }
+
+        #endregion
     }
 }
